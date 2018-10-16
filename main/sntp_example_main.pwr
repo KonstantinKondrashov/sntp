@@ -1,0 +1,130 @@
+/* Deep sleep wake up example
+
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
+
+#include <esp_timer.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/time.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "esp_sleep.h"
+#include "driver/rtc_io.h"
+#include "driver/gpio.h"
+#include "esp_clk.h"
+#include "soc/rtc.h"
+#include "esp_timer.h"
+#include "../esp32/esp_clk_internal.h"
+#define INCLUDE_DEEPSLEEP_AND_WAKEUP
+#define POWER_DETECT_GPIO 33
+
+static RTC_DATA_ATTR struct timeval sleep_enter_time;
+static RTC_DATA_ATTR uint32_t slowclk_cal_old;
+
+static void IRAM_ATTR pwr_detect_isr_handler(void* arg)   //IRAM_ATTR defined in task.h
+{
+    #ifdef INCLUDE_DEEPSLEEP_AND_WAKEUP
+        gettimeofday(&sleep_enter_time, NULL);
+        esp_sleep_enable_ext0_wakeup( POWER_DETECT_GPIO , 1); //wake up on HIGH
+        ets_printf("DS\n");  
+        esp_deep_sleep_start();
+    #else
+        uint32_t gpio_num = (uint32_t) arg;
+        ets_printf("gpio %d triggered]\n",gpio_num);
+    #endif
+
+}
+
+void app_main()
+{
+    struct timeval now;
+    /*gettimeofday(&now, NULL);
+    if (now.tv_sec < 1000000L) {
+        printf("app_main: Set current time \n");
+        now.tv_sec = 1527876000L;
+        settimeofday(&now, NULL);
+    }
+
+    gettimeofday(&now, NULL);
+    printf("gettimeofday: now.tv_sec=%ld, now.tv_usec=%ld\n", now.tv_sec, now.tv_usec);*/
+    /*esp_clk_slowclk_cal_set(2988211);
+    gettimeofday(&now, NULL);
+    printf("gettimeofday: now.tv_sec=%ld, now.tv_usec=%ld \n", now.tv_sec, now.tv_usec);*/
+
+    uint32_t slowclk_cal = esp_clk_slowclk_cal_get();
+    uint64_t rtc_time = rtc_time_get();
+    int32_t delat_cal = slowclk_cal_old - slowclk_cal;
+    printf("app_main: slowclk_cal=%d, slowclk_cal_old=%d, delta_cal=%d, rtc_time=%lld, esp_timer=%lld\n", slowclk_cal, slowclk_cal_old, delat_cal, rtc_time, esp_timer_get_time());
+    printf("app_main: slowclk_cal=%d, slowclk_cal_old=%d, delta_cal=%d, rtc_time=%lld, esp_timer=%lld\n", slowclk_cal, slowclk_cal_old, delat_cal, rtc_time, esp_timer_get_time());
+    gettimeofday(&now, NULL);
+    int sleep_time_ms = (now.tv_sec - sleep_enter_time.tv_sec) * 1000 + (now.tv_usec - sleep_enter_time.tv_usec) / 1000;
+    printf("1  sleep_time_ms: %dms\n", sleep_time_ms);
+    slowclk_cal_old = slowclk_cal;
+    if (sleep_time_ms < 0) {
+        while(1) {
+            printf("Waiting111111111 ... \n");
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }
+    }
+    gpio_config_t io_conf;
+    io_conf.intr_type = GPIO_PIN_INTR_NEGEDGE;//GPIO_INTR_ANYEDGE;//GPIO_PIN_INTR_POSEDGE;
+    io_conf.pin_bit_mask = (1ULL<<POWER_DETECT_GPIO);
+    //set as input mode    
+    io_conf.mode = GPIO_MODE_INPUT;
+    
+    //enable pull up for NEG EDGE interrupt detection, enable pull down for POS EDGE interrupt detection
+    //for POWER DETECT PIN both can be disabled?
+    io_conf.pull_up_en = 0;
+    io_conf.pull_down_en = 0;
+
+    gpio_config(&io_conf);
+
+   
+
+    //install gpio isr service  
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(POWER_DETECT_GPIO, pwr_detect_isr_handler, (void*) POWER_DETECT_GPIO);
+
+    
+ 
+#ifdef INCLUDE_DEEPSLEEP_AND_WAKEUP
+    switch (esp_sleep_get_wakeup_cause()) {
+        case ESP_SLEEP_WAKEUP_EXT0: {
+            printf("Wake up from EXT0.Time spent in deep sleep: %dms\n", sleep_time_ms);
+            break;
+        }
+        case ESP_SLEEP_WAKEUP_TIMER: {
+            printf("Wake up from timer. Time spent in deep sleep: %dms\n", sleep_time_ms);
+            break;
+        }
+        case ESP_SLEEP_WAKEUP_UNDEFINED:
+        default:
+            printf("Not a deep sleep reset\n");
+    }
+
+    printf("Waiting to enter deep sleep ......\n");
+#endif
+    int i = 0;
+   uint64_t t1, t2 = 0, t2_old;
+   t1 = 0;//system_relative_time(0);
+   while(1)
+    {
+       t2_old = t2;
+       t2 = 0;//system_relative_time(0);
+       printf("t1=%lld, t2=%lld, dF1=%lld, delta_pre=%lld \n", t1, t2, t1-t2, t2_old-t2);
+
+       vTaskDelay(2000 / portTICK_PERIOD_MS);
+       //vTaskDelay(10);//2000 / portTICK_PERIOD_MS);
+       //printf("PWR_DETECT_LEVEL %d.  %d\n",gpio_get_level(POWER_DETECT_GPIO), ++i);
+
+    }
+}
+

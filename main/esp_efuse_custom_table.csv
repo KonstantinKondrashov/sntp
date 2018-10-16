@@ -1,0 +1,18 @@
+# field_name,       |    efuse_block, | bit_start, | bit_count, |comment #
+#                   |    (EFUSE_BLK0  | (0..255)   | (1..256)   |        #
+#                   |     EFUSE_BLK1  |            |            |        #
+#                   |     EFUSE_BLK2  |            |            |        #
+#                   |     EFUSE_BLK3) |            |            |        #
+##########################################################################
+
+
+# Factory MAC address #
+####################### 
+# Factory MAC address (splitted field but it will read as entire array). Note: The order of the fields is important!
+K_MAC_FACTORY,          EFUSE_BLK3,    172,    8,    Factory MAC addr [0]
+,                       EFUSE_BLK3,    164,    8,    Factory MAC addr [1]
+,                       EFUSE_BLK3,    156,    8,    Factory MAC addr [2]
+,                       EFUSE_BLK3,    148,    8,    Factory MAC addr [3]
+,                       EFUSE_BLK3,    140,    8,    Factory MAC addr [4]
+,                       EFUSE_BLK3,    132,    8,    Factory MAC addr [5]
+K_mac_def_crc,          EFUSE_BLK3,    80,    8,    CRC8 for factory MAC address
